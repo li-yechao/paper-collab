@@ -1,0 +1,15 @@
+{
+  "name": "paper-collab",
+  "version": "1.0.0",
+  "description": "Write everything in your life",
+  "author": {
+    "name": "LiYechao",
+    "email": "liyechao@yechao.xyz"
+  },
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc"
+  }
+}
