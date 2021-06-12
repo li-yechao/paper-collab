@@ -48,7 +48,15 @@ export default class DB {
 
     await (
       await this.paperCollection
-    ).findOneAndUpdate({ _id: paperId }, { $set: { title: doc.title } })
+    ).findOneAndUpdate(
+      { _id: paperId },
+      {
+        $set: {
+          updated_at: mongodb.Long.fromNumber(Date.now()),
+          title: doc.title,
+        },
+      }
+    )
     await (
       await this.paperContentCollection
     ).findOneAndUpdate(
