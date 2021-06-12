@@ -1,7 +1,9 @@
 import { program } from 'commander'
-import ws from 'ws'
-import Client from './client'
+import { Server } from 'socket.io'
 import Config from './config'
+import { EmitEvents, ListenEvents } from './events'
+import { selectPaper } from './graphql'
+import Instance from './instance'
 
 program.name('paper-collab')
 
@@ -35,13 +37,51 @@ program
         paperGraphqlUri,
       })
 
-      const server = new ws.Server({ port: Config.shared.port })
+      const io = new Server<ListenEvents, EmitEvents>(Config.shared.port, { cors: {} })
 
       console.info(`Paper collab server started on port ${Config.shared.port}`)
 
-      server.on('connection', (ws, req) => {
-        console.info(`Client connected ${req.socket.remoteAddress}`)
-        new Client(ws)
+      io.on('connection', async socket => {
+        console.info(`Client connected ${socket.handshake.address}`)
+        const { accessToken, userId, paperId } = socket.handshake.query
+        if (
+          typeof accessToken !== 'string' ||
+          typeof userId !== 'string' ||
+          typeof paperId !== 'string'
+        ) {
+          socket._error('Required query parameters accessToken or userId or paperId is not present')
+          socket.disconnect()
+          return
+        }
+
+        try {
+          const key = Instance.key({ userId, paperId })
+
+          const paper = await selectPaper({ accessToken, userId, paperId })
+          socket.data.paper = paper
+          socket.join(key)
+          const instance = await Instance.getInstance({ userId, paperId })
+          const { doc, version } = instance
+          socket.data.version = version
+          socket.emit('paper', { version, doc: doc.toJSON() })
+
+          socket.on('transaction', async ({ version, steps, clientID }) => {
+            instance.addEvents(version, steps, clientID)
+            const sockets = await socket.in(key).fetchSockets()
+            for (const s of sockets) {
+              const e = instance.getEvents(s.data.version)
+              if (e) {
+                const { version, steps } = e
+                const clientIDs = steps.map(i => i.clientID)
+                s.emit('transaction', { version, steps, clientIDs })
+              }
+            }
+          })
+        } catch (error) {
+          socket._error(error.message)
+          socket.disconnect()
+          return
+        }
       })
     }
   )
