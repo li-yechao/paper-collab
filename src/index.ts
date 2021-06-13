@@ -66,8 +66,10 @@ program
           socket.emit('paper', { version, doc: doc.toJSON() })
 
           socket.on('transaction', async ({ version, steps, clientID }) => {
-            instance.addEvents(version, steps, clientID)
-            for (const s of await socket.nsp.in(key).fetchSockets()) {
+            const e = instance.addEvents(version, steps, clientID)
+            socket.data.version = e.version
+
+            for (const s of await socket.in(key).fetchSockets()) {
               const e = instance.getEvents(s.data.version)
               if (e) {
                 const { version, steps } = e

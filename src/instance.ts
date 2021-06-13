@@ -36,10 +36,10 @@ export default class Instance {
   version = 0
   steps: (Step & { clientID: ClientID })[] = []
 
-  addEvents(version: Version, steps: DocJson[], clientID: ClientID) {
+  addEvents(version: Version, steps: DocJson[], clientID: ClientID): { version: Version } {
     this.checkVersion(version)
     if (version !== this.version) {
-      return
+      throw new Error(`Invalid version ${version}`)
     }
 
     const _steps = steps.map(i => Step.fromJSON(this.schema, i)) as (Step & {
@@ -55,10 +55,13 @@ export default class Instance {
       doc = result.doc
     }
     this.doc = doc
-    this.version += steps.length
+    const newVersion = this.version + steps.length
+    this.version = newVersion
     this.steps = this.steps.concat(_steps)
 
     this.save()
+
+    return { version: newVersion }
   }
 
   getEvents(version: number) {
