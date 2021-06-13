@@ -67,12 +67,12 @@ program
 
           socket.on('transaction', async ({ version, steps, clientID }) => {
             instance.addEvents(version, steps, clientID)
-            const sockets = await socket.in(key).fetchSockets()
-            for (const s of sockets) {
+            for (const s of await socket.nsp.in(key).fetchSockets()) {
               const e = instance.getEvents(s.data.version)
               if (e) {
                 const { version, steps } = e
                 const clientIDs = steps.map(i => i.clientID)
+                s.data.version = version
                 s.emit('transaction', { version, steps, clientIDs })
               }
             }
