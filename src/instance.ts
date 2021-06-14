@@ -15,24 +15,25 @@ export default class Instance {
     if (!instance) {
       instance = new Instance({
         paperId: id.paperId,
-        doc: await DB.shared.selectPaperDocNode(id.paperId, schema),
         schema,
+        ...(await DB.shared.selectPaper(id.paperId, schema)),
       })
       this.shared.set(this.key(id), instance)
     }
     return instance
   }
 
-  constructor(options: { schema: Schema; paperId: string; doc: Node }) {
+  constructor(options: { schema: Schema; paperId: string; doc: Node; version: Version }) {
     this.schema = options.schema
     this.paperId = options.paperId
     this.doc = options.doc
+    this.version = options.version
   }
 
   schema: Schema
   paperId: string
   doc: Node
-  version = 0
+  version: Version
   steps: (Step & { clientID: ClientID })[] = []
 
   addEvents(version: Version, steps: DocJson[], clientID: ClientID): { version: Version } {
@@ -84,7 +85,7 @@ export default class Instance {
   private save = debounce(() => {
     console.info(`Auto save ${this.paperId} start`)
     DB.shared
-      .updatePaperDocNode(this.paperId, this.doc)
+      .updatePaper(this)
       .then(() => {
         console.info(`Auto save ${this.paperId} success`)
       })
