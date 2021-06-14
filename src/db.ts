@@ -1,6 +1,7 @@
 import mongodb from 'mongodb'
+import { Node, Schema } from 'prosemirror-model'
 import Config from './config'
-import { Document } from './doc'
+import { DocJson } from './events'
 
 export interface DBOptions {
   uri: string
@@ -37,39 +38,32 @@ export default class DB {
   private paperCollection: Promise<mongodb.Collection>
   private paperContentCollection: Promise<mongodb.Collection>
 
-  async selectPaperDocument(paperId: string): Promise<Document> {
-    const title = (await (await this.paperCollection).findOne({ _id: paperId })).title
-    const content = (await (await this.paperContentCollection).findOne({ _id: paperId })).content
-    return { title, content }
+  async selectPaperDocNode(paperId: string, schema: Schema): Promise<Node> {
+    return Node.fromJSON(schema, await this.selectPaperDoc(paperId))
   }
 
-  async updatePaperDocument(paperId: string, doc: Document) {
-    const oldContent = (await (await this.paperContentCollection).findOne({ _id: paperId })).content
+  async updatePaperDocNode(paperId: string, node: Node) {
+    const title = node.firstChild?.type.name === 'title' ? node.firstChild.textContent : ''
+    await this.updatePaperDoc(paperId, title, node.toJSON())
+  }
 
+  async selectPaperDoc(paperId: string): Promise<DocJson> {
+    return (
+      (
+        await (
+          await this.paperContentCollection
+        ).findOne({ _id: paperId }, { projection: { doc: true } })
+      ).doc || {}
+    )
+  }
+
+  async updatePaperDoc(paperId: string, title: string, doc: DocJson) {
     await (
       await this.paperCollection
     ).findOneAndUpdate(
       { _id: paperId },
-      {
-        $set: {
-          updated_at: mongodb.Long.fromNumber(Date.now()),
-          title: doc.title,
-        },
-      }
+      { $set: { updated_at: mongodb.Long.fromNumber(Date.now()), title } }
     )
-    await (
-      await this.paperContentCollection
-    ).findOneAndUpdate(
-      { _id: paperId },
-      {
-        $set: { content: doc.content },
-        $push: {
-          history: {
-            $each: [{ content: oldContent }],
-            $slice: -10,
-          },
-        },
-      }
-    )
+    await (await this.paperContentCollection).findOneAndUpdate({ _id: paperId }, { $set: { doc } })
   }
 }

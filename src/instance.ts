@@ -2,7 +2,6 @@ import debounce from 'lodash/debounce'
 import { Node, Schema } from 'prosemirror-model'
 import { Step } from 'prosemirror-transform'
 import DB from './db'
-import { documentToProsemirrorDoc, prosemirrorDocToDocument } from './doc'
 import { ClientID, DocJson, Version } from './events'
 import { schema } from './schema'
 
@@ -14,11 +13,11 @@ export default class Instance {
   static async getInstance(id: { userId: string; paperId: string }): Promise<Instance> {
     let instance = this.shared.get(this.key(id))
     if (!instance) {
-      const doc = Node.fromJSON(
+      instance = new Instance({
+        paperId: id.paperId,
+        doc: await DB.shared.selectPaperDocNode(id.paperId, schema),
         schema,
-        documentToProsemirrorDoc(await DB.shared.selectPaperDocument(id.paperId))
-      )
-      instance = new Instance({ paperId: id.paperId, doc, schema })
+      })
       this.shared.set(this.key(id), instance)
     }
     return instance
@@ -85,7 +84,7 @@ export default class Instance {
   private save = debounce(() => {
     console.info(`Auto save ${this.paperId} start`)
     DB.shared
-      .updatePaperDocument(this.paperId, prosemirrorDocToDocument(this.doc))
+      .updatePaperDocNode(this.paperId, this.doc)
       .then(() => {
         console.info(`Auto save ${this.paperId} success`)
       })
