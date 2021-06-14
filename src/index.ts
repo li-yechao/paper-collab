@@ -41,6 +41,14 @@ program
 
       console.info(`Paper collab server started on port ${Config.shared.port}`)
 
+      io.sockets.adapter.on('create-room', async room => {
+        const key = Instance.keyInfo(room)
+        if (key) {
+          const instance = await Instance.getInstance(key)
+          instance.on('persistence', e => io.in(room).emit('persistence', e))
+        }
+      })
+
       io.on('connection', async socket => {
         console.info(`Client connected ${socket.handshake.address}`)
         const { accessToken, userId, paperId } = socket.handshake.query
@@ -61,9 +69,11 @@ program
           socket.data.paper = paper
           socket.join(key)
           const instance = await Instance.getInstance({ userId, paperId })
+
           const { doc, version } = instance
           socket.data.version = version
           socket.emit('paper', { version, doc: doc.toJSON() })
+          socket.emit('persistence', instance.persistence)
 
           socket.on('transaction', async ({ version, steps, clientID }) => {
             const e = instance.addEvents(version, steps, clientID)

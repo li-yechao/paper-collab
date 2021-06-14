@@ -38,31 +38,53 @@ export default class DB {
   private paperCollection: Promise<mongodb.Collection>
   private paperContentCollection: Promise<mongodb.Collection>
 
-  async selectPaper(paperId: string, schema: Schema): Promise<{ doc: Node; version: Version }> {
-    const { doc, version } = await this._selectPaper(paperId)
+  async selectPaper(
+    paperId: string,
+    schema: Schema
+  ): Promise<{ doc: Node; version: Version; updatedAt: number }> {
+    const { doc, version, updatedAt } = await this._selectPaper(paperId)
     return {
       doc: Node.fromJSON(schema, doc),
       version,
+      updatedAt,
     }
   }
 
-  async updatePaper({ paperId, doc, version }: { paperId: string; doc: Node; version: Version }) {
+  async updatePaper({
+    paperId,
+    doc,
+    version,
+  }: {
+    paperId: string
+    doc: Node
+    version: Version
+  }): Promise<{ updatedAt: number; version: Version }> {
     const title = doc.firstChild?.type.name === 'title' ? doc.firstChild.textContent : ''
-    await this._updatePaper({ paperId, title, doc: doc.toJSON(), version })
+    return this._updatePaper({ paperId, title, doc: doc.toJSON(), version })
   }
 
-  private async _selectPaper(paperId: string): Promise<{ doc: DocJson; version: Version }> {
+  private async _selectPaper(
+    paperId: string
+  ): Promise<{ doc: DocJson; version: Version; updatedAt: number }> {
     const paper = await (
-      await this.paperContentCollection
-    ).findOne({ _id: paperId }, { projection: { doc: true, version: true } })
+      await this.paperCollection
+    ).findOne<{ updated_at: number }>({ _id: paperId }, { projection: { updated_at: true } })
 
-    if (!paper) {
+    const content = await (
+      await this.paperContentCollection
+    ).findOne<{ doc: DocJson | null; version: Version | null }>(
+      { _id: paperId },
+      { projection: { doc: true, version: true } }
+    )
+
+    if (!paper || !content) {
       throw new Error(`Paper not found ${paperId}`)
     }
 
     return {
-      doc: paper.doc || {},
-      version: paper.version || 0,
+      doc: content.doc ?? {},
+      version: content.version ?? 0,
+      updatedAt: paper.updated_at,
     }
   }
 
@@ -76,15 +98,19 @@ export default class DB {
     title: string
     doc: DocJson
     version: Version
-  }) {
+  }): Promise<{ updatedAt: number; version: Version }> {
+    const updatedAt = Date.now()
+
     await (
       await this.paperCollection
     ).findOneAndUpdate(
       { _id: paperId },
-      { $set: { updated_at: mongodb.Long.fromNumber(Date.now()), title } }
+      { $set: { updated_at: mongodb.Long.fromNumber(updatedAt), title } }
     )
     await (
       await this.paperContentCollection
     ).findOneAndUpdate({ _id: paperId }, { $set: { doc, version } })
+
+    return { updatedAt, version }
   }
 }

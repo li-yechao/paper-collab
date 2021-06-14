@@ -11,4 +11,5 @@ export interface ListenEvents {
 export interface EmitEvents {
   paper: (e: { version: Version; doc: DocJson }) => void
   transaction: (e: { version: Version; steps: DocJson[]; clientIDs: ClientID[] }) => void
+  persistence: (e: { version: Version; updatedAt: number }) => void
 }
