@@ -1,12 +1,13 @@
 import debounce from 'lodash/debounce'
 import { Node, Schema } from 'prosemirror-model'
 import { Step } from 'prosemirror-transform'
-import DB from './db'
-import { ClientID, DocJson, Version } from './events'
+import DB, { DocJson, Version } from './db'
 import { schema } from './schema'
 import { StrictEventEmitter } from './typed-events'
 
 const AUTO_SAVE_DEBOUNCE_WAIT = 1e4
+
+export type ClientID = string | number
 
 export default class Instance extends StrictEventEmitter<
   {},

@@ -1,9 +1,19 @@
 import { program } from 'commander'
 import { Server } from 'socket.io'
 import Config from './config'
-import { EmitEvents, ListenEvents } from './events'
+import { DocJson, Version } from './db'
 import { selectPaper } from './graphql'
-import Instance from './instance'
+import Instance, { ClientID } from './instance'
+
+export interface IOListenEvents {
+  transaction: (e: { version: Version; steps: DocJson[]; clientID: ClientID }) => void
+}
+
+export interface IOEmitEvents {
+  paper: (e: { version: Version; doc: DocJson }) => void
+  transaction: (e: { version: Version; steps: DocJson[]; clientIDs: ClientID[] }) => void
+  persistence: (e: { version: Version; updatedAt: number }) => void
+}
 
 program.name('paper-collab')
 
@@ -37,7 +47,7 @@ program
         paperGraphqlUri,
       })
 
-      const io = new Server<ListenEvents, EmitEvents>(Config.shared.port, { cors: {} })
+      const io = new Server<IOListenEvents, IOEmitEvents>(Config.shared.port, { cors: {} })
 
       console.info(`Paper collab server started on port ${Config.shared.port}`)
 

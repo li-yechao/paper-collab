@@ -2,7 +2,10 @@ import mongodb from 'mongodb'
 import { Node, Schema } from 'prosemirror-model'
 import { EditorState } from 'prosemirror-state'
 import Config from './config'
-import { DocJson, Version } from './events'
+
+export type Version = number
+
+export type DocJson = { [key: string]: any }
 
 export interface DBOptions {
   uri: string
