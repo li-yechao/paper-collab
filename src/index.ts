@@ -90,6 +90,7 @@ program
             }
           })
         } catch (error) {
+          console.error(error)
           socket._error(error.message)
           socket.disconnect()
           return

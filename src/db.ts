@@ -1,5 +1,6 @@
 import mongodb from 'mongodb'
 import { Node, Schema } from 'prosemirror-model'
+import { EditorState } from 'prosemirror-state'
 import Config from './config'
 import { DocJson, Version } from './events'
 
@@ -44,8 +45,8 @@ export default class DB {
   ): Promise<{ doc: Node; version: Version; updatedAt: number }> {
     const { doc, version, updatedAt } = await this._selectPaper(paperId)
     return {
-      doc: Node.fromJSON(schema, doc),
-      version,
+      doc: (doc && Node.fromJSON(schema, doc)) || EditorState.create({ schema }).doc,
+      version: version ?? 0,
       updatedAt,
     }
   }
@@ -65,7 +66,7 @@ export default class DB {
 
   private async _selectPaper(
     paperId: string
-  ): Promise<{ doc: DocJson; version: Version; updatedAt: number }> {
+  ): Promise<{ doc: DocJson | null; version: Version | null; updatedAt: number }> {
     const paper = await (
       await this.paperCollection
     ).findOne<{ updated_at: number }>({ _id: paperId }, { projection: { updated_at: true } })
@@ -82,8 +83,8 @@ export default class DB {
     }
 
     return {
-      doc: content.doc ?? {},
-      version: content.version ?? 0,
+      doc: content.doc,
+      version: content.version,
       updatedAt: paper.updated_at,
     }
   }
