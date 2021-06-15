@@ -1,11 +1,10 @@
 import debounce from 'lodash/debounce'
 import { Node, Schema } from 'prosemirror-model'
 import { Step } from 'prosemirror-transform'
+import Config from './config'
 import DB, { DocJson, Version } from './db'
 import { schema } from './schema'
 import { StrictEventEmitter } from './typed-events'
-
-const AUTO_SAVE_DEBOUNCE_WAIT = 1e4
 
 export type ClientID = string | number
 
@@ -87,7 +86,7 @@ export default class Instance extends StrictEventEmitter<
     this.version = newVersion
     this.steps = this.steps.concat(_steps)
 
-    this.save()
+    this.autoSave()
 
     return { version: newVersion }
   }
@@ -104,22 +103,19 @@ export default class Instance extends StrictEventEmitter<
     }
   }
 
+  async save() {
+    if (this.version > this.persistence.version) {
+      this.persistence = await DB.shared.updatePaper(this)
+    }
+  }
+
   private checkVersion(version: number) {
     if (version < 0 || version > this.version) {
       throw new Error(`Invalid version ${version}`)
     }
   }
 
-  private save = debounce(() => {
-    console.info(`Auto save ${this.paperId} start`)
-    DB.shared
-      .updatePaper(this)
-      .then(({ version, updatedAt }) => {
-        this.persistence = { version, updatedAt }
-        console.info(`Auto save ${this.paperId} success`)
-      })
-      .catch(err => {
-        console.error(`Auto save ${this.paperId} failed`, err)
-      })
-  }, AUTO_SAVE_DEBOUNCE_WAIT)
+  private autoSave = debounce(() => {
+    this.save()
+  }, Config.shared.autoSaveWaitMilliseconds)
 }

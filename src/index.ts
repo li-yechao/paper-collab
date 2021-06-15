@@ -7,6 +7,7 @@ import Instance, { ClientID } from './instance'
 
 export interface IOListenEvents {
   transaction: (e: { version: Version; steps: DocJson[]; clientID: ClientID }) => void
+  save: () => void
 }
 
 export interface IOEmitEvents {
@@ -21,6 +22,7 @@ program
   .command('serve')
   .description('Start collab server')
   .option('-p, --port [port]', 'Listening port', '8080')
+  .option('--auto-save-wait [milliseconds]', 'Auto save wait milliseconds', '5000')
   .requiredOption('--mongo-uri [uri]', 'Mongodb uri')
   .requiredOption('--mongo-database [database]', 'Mongodb database name')
   .requiredOption('--mongo-paper-collection [collection]', 'Mongodb paper collection name')
@@ -37,6 +39,7 @@ program
       mongoPaperCollection,
       mongoPaperContentCollection,
       paperGraphqlUri,
+      autoSaveWait,
     }) => {
       Config.initShared({
         port: Number(port),
@@ -45,6 +48,7 @@ program
         mongoPaperCollection,
         mongoPaperContentCollection,
         paperGraphqlUri,
+        autoSaveWaitMilliseconds: Number(autoSaveWait),
       })
 
       const io = new Server<IOListenEvents, IOEmitEvents>(Config.shared.port, { cors: {} })
@@ -98,6 +102,9 @@ program
                 s.emit('transaction', { version, steps, clientIDs })
               }
             }
+          })
+          socket.on('save', () => {
+            instance.save()
           })
         } catch (error) {
           console.error(error)

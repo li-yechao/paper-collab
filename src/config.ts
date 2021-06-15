@@ -5,6 +5,7 @@ export interface ConfigOptions {
   mongoPaperCollection: string
   mongoPaperContentCollection: string
   paperGraphqlUri: string
+  autoSaveWaitMilliseconds: number
 }
 
 export default class Config {
@@ -26,6 +27,7 @@ export default class Config {
     this.mongoPaperCollection = config.mongoPaperCollection
     this.mongoPaperContentCollection = config.mongoPaperContentCollection
     this.paperGraphqlUri = config.paperGraphqlUri
+    this.autoSaveWaitMilliseconds = config.autoSaveWaitMilliseconds
   }
 
   readonly port: number
@@ -39,4 +41,6 @@ export default class Config {
   readonly mongoPaperContentCollection: string
 
   readonly paperGraphqlUri: string
+
+  readonly autoSaveWaitMilliseconds: number
 }
