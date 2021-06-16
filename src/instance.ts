@@ -13,21 +13,24 @@ export default class Instance extends StrictEventEmitter<
   {},
   { persistence: (e: { version: Version; updatedAt: number }) => void }
 > {
-  private static shared = new Map<string, Instance>()
+  private static shared = new Map<string, Promise<Instance>>()
   static key = (id: { userId: string; paperId: string }) => `paper-${id.userId}-${id.paperId}`
   static keyInfo(key: string) {
     const { userId, paperId } =
       key.match(/^paper-(?<userId>[\d|a-f]+)-(?<paperId>[\d|a-f]+)$/)?.groups ?? {}
     return userId && paperId ? { userId, paperId } : undefined
   }
-  static async getInstance(id: { userId: string; paperId: string }): Promise<Instance> {
+  static getInstance(id: { userId: string; paperId: string }): Promise<Instance> {
     let instance = this.shared.get(this.key(id))
     if (!instance) {
-      instance = new Instance({
-        paperId: id.paperId,
-        schema,
-        ...(await DB.shared.selectPaper(id.paperId, schema)),
-      })
+      instance = DB.shared.selectPaper(id.paperId, schema).then(
+        paper =>
+          new Instance({
+            paperId: id.paperId,
+            schema,
+            ...paper,
+          })
+      )
       this.shared.set(this.key(id), instance)
     }
     return instance
