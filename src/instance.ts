@@ -57,13 +57,17 @@ export default class Instance extends StrictEventEmitter<
   version: Version
   steps: (Step & { clientID: ClientID })[] = []
 
+  private _saving = false
+
   private _persistence: { version: Version; updatedAt: number }
   get persistence() {
     return this._persistence
   }
   private set persistence(v) {
-    this._persistence = v
-    this.emitReserved('persistence', v)
+    if (this._persistence.version !== v.version || this._persistence.updatedAt !== v.updatedAt) {
+      this._persistence = v
+      this.emitReserved('persistence', v)
+    }
   }
 
   addEvents(version: Version, steps: DocJson[], clientID: ClientID): { version: Version } {
@@ -107,8 +111,16 @@ export default class Instance extends StrictEventEmitter<
   }
 
   async save() {
-    if (this.version > this.persistence.version) {
-      this.persistence = await DB.shared.updatePaper(this)
+    if (this._saving) {
+      return
+    }
+    this._saving = true
+    try {
+      if (this.version > this.persistence.version) {
+        this.persistence = await DB.shared.updatePaper(this)
+      }
+    } finally {
+      this._saving = false
     }
   }
 
