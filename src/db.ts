@@ -81,13 +81,13 @@ export default class DB {
       { projection: { doc: true, version: true } }
     )
 
-    if (!paper || !content) {
+    if (!paper) {
       throw new Error(`Paper not found ${paperId}`)
     }
 
     return {
-      doc: content.doc,
-      version: content.version,
+      doc: content?.doc ?? null,
+      version: content?.version ?? null,
       updatedAt: paper.updated_at,
     }
   }
