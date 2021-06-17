@@ -6,12 +6,12 @@ import { selectPaper } from './graphql'
 import Instance, { ClientID } from './instance'
 
 export interface IOListenEvents {
-  transaction: (e: { version: Version; steps: DocJson[]; clientID: ClientID }) => void
+  transaction: (e: { version: Version; steps: DocJson[] }) => void
   save: () => void
 }
 
 export interface IOEmitEvents {
-  paper: (e: { version: Version; doc: DocJson }) => void
+  paper: (e: { clientID: ClientID; version: Version; doc: DocJson }) => void
   transaction: (e: { version: Version; steps: DocJson[]; clientIDs: ClientID[] }) => void
   persistence: (e: { version: Version; updatedAt: number }) => void
 }
@@ -86,11 +86,11 @@ program
 
           const { doc, version } = instance
           socket.data.version = version
-          socket.emit('paper', { version, doc: doc.toJSON() })
+          socket.emit('paper', { clientID: socket.id, version, doc: doc.toJSON() })
           socket.emit('persistence', instance.persistence)
 
-          socket.on('transaction', async ({ version, steps, clientID }) => {
-            const e = instance.addEvents(version, steps, clientID)
+          socket.on('transaction', async ({ version, steps }) => {
+            const e = instance.addEvents(version, steps, socket.id)
             socket.data.version = e.version
 
             for (const s of await socket.in(key).fetchSockets()) {
