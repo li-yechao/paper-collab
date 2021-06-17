@@ -48,7 +48,7 @@ export const schema = new Schema({
       defining: true,
     },
     code_block: {
-      attrs: { language: { default: null } },
+      attrs: { editorId: { default: null }, language: { default: null } },
       content: 'text*',
       group: 'block',
       code: true,
