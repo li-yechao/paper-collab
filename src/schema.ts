@@ -10,6 +10,7 @@ export const schema = new Schema({
     },
     title: {
       content: 'text*',
+      marks: '',
       defining: true,
     },
     paragraph: {
@@ -19,6 +20,7 @@ export const schema = new Schema({
     heading: {
       attrs: { level: { default: 1 } },
       content: 'text*',
+      marks: '',
       group: 'block',
       defining: true,
     },
@@ -50,6 +52,7 @@ export const schema = new Schema({
     code_block: {
       attrs: { editorId: { default: null }, language: { default: null } },
       content: 'text*',
+      marks: '',
       group: 'block',
       code: true,
       defining: true,
@@ -58,6 +61,7 @@ export const schema = new Schema({
     },
     image_block: {
       attrs: { src: { default: null }, caption: { default: null } },
+      marks: '',
       group: 'block',
       defining: true,
       isolating: true,
@@ -66,6 +70,7 @@ export const schema = new Schema({
     },
     video_block: {
       attrs: { src: { default: null }, caption: { default: null } },
+      marks: '',
       group: 'block',
       defining: true,
       isolating: true,
