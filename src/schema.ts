@@ -85,7 +85,9 @@ export const schema = new Schema({
     },
     bold: {},
     italic: {},
-    code: {},
+    code: {
+      excludes: '_',
+    },
     underline: {},
     strikethrough: {},
   },
