@@ -90,5 +90,6 @@ export const schema = new Schema({
     },
     underline: {},
     strikethrough: {},
+    highlight: {},
   },
 })
