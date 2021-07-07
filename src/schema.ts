@@ -66,11 +66,15 @@ export const schema = new Schema({
         naturalHeight: { default: null },
         thumbnail: { default: null },
       },
-      content: 'text*',
+      content: 'image_block_content',
       marks: '',
       group: 'block',
       draggable: true,
       isolating: true,
+    },
+    image_block_content: {
+      content: 'text*',
+      marks: '',
     },
     video_block: {
       attrs: {
@@ -79,11 +83,15 @@ export const schema = new Schema({
         naturalHeight: { default: null },
         thumbnail: { default: null },
       },
-      content: 'text*',
+      content: 'video_block_content',
       marks: '',
       group: 'block',
       draggable: true,
       isolating: true,
+    },
+    video_block_content: {
+      content: 'text*',
+      marks: '',
     },
   },
   marks: {
