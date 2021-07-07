@@ -82,6 +82,7 @@ export const schema = new Schema({
         naturalWidth: { default: null },
         naturalHeight: { default: null },
         thumbnail: { default: null },
+        poster: { default: null },
       },
       content: 'video_block_content',
       marks: '',
