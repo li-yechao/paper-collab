@@ -14,13 +14,12 @@ export default class Instance extends StrictEventEmitter<
   { persistence: (e: { version: Version; updatedAt: number }) => void }
 > {
   private static shared = new Map<string, Promise<Instance>>()
-  static key = (id: { userId: string; paperId: string }) => `paper-${id.userId}-${id.paperId}`
+  static key = (id: { paperId: string }) => `paper-${id.paperId}`
   static keyInfo(key: string) {
-    const { userId, paperId } =
-      key.match(/^paper-(?<userId>[\d|a-f]+)-(?<paperId>[\d|a-f]+)$/)?.groups ?? {}
-    return userId && paperId ? { userId, paperId } : undefined
+    const { paperId } = key.match(/^paper-(?<paperId>[\d|a-f]+)$/)?.groups ?? {}
+    return paperId ? { paperId } : undefined
   }
-  static getInstance(id: { userId: string; paperId: string }): Promise<Instance> {
+  static getInstance(id: { paperId: string }): Promise<Instance> {
     let instance = this.shared.get(this.key(id))
     if (!instance) {
       instance = DB.shared.selectPaper(id.paperId, schema).then(
@@ -116,8 +115,12 @@ export default class Instance extends StrictEventEmitter<
     }
     this._saving = true
     try {
-      if (this.version > this.persistence.version) {
-        this.persistence = await DB.shared.updatePaper(this)
+      const { version } = this
+      if (version > this.persistence.version) {
+        this.persistence = {
+          ...(await DB.shared.updatePaper(this)),
+          version,
+        }
       }
     } finally {
       this._saving = false

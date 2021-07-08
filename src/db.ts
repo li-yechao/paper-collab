@@ -10,8 +10,7 @@ export type DocJson = { [key: string]: any }
 export interface DBOptions {
   uri: string
   database: string
-  paperCollection: string
-  paperContentCollection: string
+  collectionPaper: string
 }
 
 export default class DB {
@@ -21,8 +20,7 @@ export default class DB {
       this._shared = new DB({
         uri: Config.shared.mongoUri,
         database: Config.shared.mongoDatabase,
-        paperCollection: Config.shared.mongoPaperCollection,
-        paperContentCollection: Config.shared.mongoPaperContentCollection,
+        collectionPaper: Config.shared.mongoCollectionPaper,
       })
     }
     return this._shared
@@ -35,19 +33,18 @@ export default class DB {
     })
       .connect()
       .then(client => client.db(options.database))
-    this.paperCollection = db.then(db => db.collection(options.paperCollection))
-    this.paperContentCollection = db.then(db => db.collection(options.paperContentCollection))
+    this.collectionPaper = db.then(db => db.collection(options.collectionPaper))
   }
 
-  private paperCollection: Promise<mongodb.Collection>
-  private paperContentCollection: Promise<mongodb.Collection>
+  private collectionPaper: Promise<mongodb.Collection>
 
   async selectPaper(
     paperId: string,
     schema: Schema
-  ): Promise<{ doc: Node; version: Version; updatedAt: number }> {
-    const { doc, version, updatedAt } = await this._selectPaper(paperId)
+  ): Promise<{ title: string | null; doc: Node; version: Version; updatedAt: number }> {
+    const { title, doc, version, updatedAt } = await this._selectPaper(paperId)
     return {
+      title,
       doc: (doc && Node.fromJSON(schema, doc)) || EditorState.create({ schema }).doc,
       version: version ?? 0,
       updatedAt,
@@ -62,23 +59,27 @@ export default class DB {
     paperId: string
     doc: Node
     version: Version
-  }): Promise<{ updatedAt: number; version: Version }> {
+  }): Promise<{ updatedAt: number }> {
     const title = doc.firstChild?.type.name === 'title' ? doc.firstChild.textContent : ''
-    return this._updatePaper({ paperId, title, doc: doc.toJSON(), version })
+    return await this._updatePaper({ paperId, title, doc: doc.toJSON(), version })
   }
 
-  private async _selectPaper(
-    paperId: string
-  ): Promise<{ doc: DocJson | null; version: Version | null; updatedAt: number }> {
+  private async _selectPaper(paperId: string): Promise<{
+    title: string | null
+    doc: DocJson | null
+    version: Version | null
+    updatedAt: number
+  }> {
     const paper = await (
-      await this.paperCollection
-    ).findOne<{ updated_at: number }>({ _id: paperId }, { projection: { updated_at: true } })
-
-    const content = await (
-      await this.paperContentCollection
-    ).findOne<{ doc: DocJson | null; version: Version | null }>(
+      await this.collectionPaper
+    ).findOne<{
+      title: string | null
+      doc: DocJson | null
+      updated_at: number
+      version: Version | null
+    }>(
       { _id: paperId },
-      { projection: { doc: true, version: true } }
+      { projection: { title: true, doc: true, updated_at: true, version: true } }
     )
 
     if (!paper) {
@@ -86,8 +87,9 @@ export default class DB {
     }
 
     return {
-      doc: content?.doc ?? null,
-      version: content?.version ?? null,
+      title: paper.title,
+      doc: paper.doc,
+      version: paper.version,
       updatedAt: paper.updated_at,
     }
   }
@@ -102,19 +104,15 @@ export default class DB {
     title: string
     doc: DocJson
     version: Version
-  }): Promise<{ updatedAt: number; version: Version }> {
+  }): Promise<{ updatedAt: number }> {
     const updatedAt = Date.now()
 
     await (
-      await this.paperCollection
+      await this.collectionPaper
     ).findOneAndUpdate(
       { _id: paperId },
-      { $set: { updated_at: mongodb.Long.fromNumber(updatedAt), title } }
+      { $set: { updated_at: mongodb.Long.fromNumber(updatedAt), title, doc, version } }
     )
-    await (
-      await this.paperContentCollection
-    ).findOneAndUpdate({ _id: paperId }, { $set: { doc, version } })
-
-    return { updatedAt, version }
+    return { updatedAt }
   }
 }

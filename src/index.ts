@@ -1,8 +1,8 @@
 import { program } from 'commander'
-import { Server } from 'socket.io'
+import jsonwebtoken from 'jsonwebtoken'
+import { Server, Socket } from 'socket.io'
 import Config from './config'
 import { DocJson, Version } from './db'
-import { selectPaper } from './graphql'
 import Instance, { ClientID } from './instance'
 
 export interface IOListenEvents {
@@ -16,38 +16,33 @@ export interface IOEmitEvents {
   persistence: (e: { version: Version; updatedAt: number }) => void
 }
 
+export interface AccessTokenPayload {
+  iat: number
+  exp: number
+  sub: string
+  paper_id: string
+  read_only?: boolean
+}
+
 program.name('paper-collab')
 
 program
   .command('serve')
   .description('Start collab server')
   .option('-p, --port [port]', 'Listening port', '8080')
+  .requiredOption('--access-token-secret [secret]', 'Access token secret')
   .option('--auto-save-wait [milliseconds]', 'Auto save wait milliseconds', '5000')
   .requiredOption('--mongo-uri [uri]', 'Mongodb uri')
   .requiredOption('--mongo-database [database]', 'Mongodb database name')
-  .requiredOption('--mongo-paper-collection [collection]', 'Mongodb paper collection name')
-  .requiredOption(
-    '--mongo-paper-content-collection [collection]',
-    'Mongodb paper content collection name'
-  )
-  .requiredOption('--paper-graphql-uri [uri]', 'Paper graphql uri')
+  .requiredOption('--mongo-collection-paper [collection]', 'Mongodb paper collection name')
   .action(
-    ({
-      port,
-      mongoUri,
-      mongoDatabase,
-      mongoPaperCollection,
-      mongoPaperContentCollection,
-      paperGraphqlUri,
-      autoSaveWait,
-    }) => {
+    ({ port, accessTokenSecret, mongoUri, mongoDatabase, mongoCollectionPaper, autoSaveWait }) => {
       Config.initShared({
         port: Number(port),
+        accessTokenSecret,
         mongoUri,
         mongoDatabase,
-        mongoPaperCollection,
-        mongoPaperContentCollection,
-        paperGraphqlUri,
+        mongoCollectionPaper,
         autoSaveWaitMilliseconds: Number(autoSaveWait),
       })
 
@@ -65,24 +60,17 @@ program
 
       io.on('connection', async socket => {
         console.info(`Client connected ${socket.handshake.address}`)
-        const { accessToken, userId, paperId } = socket.handshake.query
-        if (
-          typeof accessToken !== 'string' ||
-          typeof userId !== 'string' ||
-          typeof paperId !== 'string'
-        ) {
-          socket._error('Required query parameters accessToken or userId or paperId is not present')
-          socket.disconnect()
-          return
-        }
 
         try {
-          const key = Instance.key({ userId, paperId })
+          const token = getToken(socket, Config.shared.accessTokenSecret)
+          const { paperId } = socket.handshake.query
+          if (token.paper_id !== paperId) {
+            throw new Error(`Forbidden access paper ${paperId}`)
+          }
 
-          const paper = await selectPaper({ accessToken, userId, paperId })
-          socket.data.paper = paper
+          const key = Instance.key({ paperId })
           socket.join(key)
-          const instance = await Instance.getInstance({ userId, paperId })
+          const instance = await Instance.getInstance({ paperId })
 
           const { doc, version } = instance
           socket.data.version = version
@@ -90,6 +78,10 @@ program
           socket.emit('persistence', instance.persistence)
 
           socket.on('transaction', async ({ version, steps }) => {
+            if (!token.read_only) {
+              throw new Error(`ReadOnly can not write anything`)
+            }
+
             const e = instance.addEvents(version, steps, socket.id)
             socket.data.version = e.version
 
@@ -104,6 +96,10 @@ program
             }
           })
           socket.on('save', () => {
+            if (!token.read_only) {
+              throw new Error(`ReadOnly can not write anything`)
+            }
+
             instance.save()
           })
         } catch (error) {
@@ -115,6 +111,33 @@ program
       })
     }
   )
+
+function getToken(socket: Socket, secret: jsonwebtoken.Secret): AccessTokenPayload {
+  const { authorization } = socket.handshake.headers
+  if (!authorization) {
+    throw new Error('Required header Authorization is not present')
+  }
+  if (!authorization.startsWith('Bearer ')) {
+    throw new Error('Invalid token type')
+  }
+  const payload = jsonwebtoken.verify(authorization.replace(/^Bearer\s/, ''), secret)
+  if (
+    typeof payload === 'object' &&
+    typeof payload.iat === 'number' &&
+    typeof payload.exp === 'number' &&
+    typeof payload.sub === 'string' &&
+    typeof payload.paper_id === 'string'
+  ) {
+    return {
+      iat: payload.iat,
+      exp: payload.exp,
+      sub: payload.sub,
+      paper_id: payload.paper_id,
+      read_only: typeof payload.read_only === 'boolean' ? payload.read_only : true,
+    }
+  }
+  throw new Error('Unsupported token')
+}
 
 program.parse(process.argv)
 

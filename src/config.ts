@@ -1,10 +1,9 @@
 export interface ConfigOptions {
   port: number
+  accessTokenSecret: string
   mongoUri: string
   mongoDatabase: string
-  mongoPaperCollection: string
-  mongoPaperContentCollection: string
-  paperGraphqlUri: string
+  mongoCollectionPaper: string
   autoSaveWaitMilliseconds: number
 }
 
@@ -22,25 +21,22 @@ export default class Config {
 
   private constructor(config: ConfigOptions) {
     this.port = config.port
+    this.accessTokenSecret = config.accessTokenSecret
     this.mongoUri = config.mongoUri
     this.mongoDatabase = config.mongoDatabase
-    this.mongoPaperCollection = config.mongoPaperCollection
-    this.mongoPaperContentCollection = config.mongoPaperContentCollection
-    this.paperGraphqlUri = config.paperGraphqlUri
+    this.mongoCollectionPaper = config.mongoCollectionPaper
     this.autoSaveWaitMilliseconds = config.autoSaveWaitMilliseconds
   }
 
   readonly port: number
 
+  readonly accessTokenSecret: string
+
   readonly mongoUri: string
 
   readonly mongoDatabase: string
 
-  readonly mongoPaperCollection: string
-
-  readonly mongoPaperContentCollection: string
-
-  readonly paperGraphqlUri: string
+  readonly mongoCollectionPaper: string
 
   readonly autoSaveWaitMilliseconds: number
 }
