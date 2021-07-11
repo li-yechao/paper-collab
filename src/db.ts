@@ -1,4 +1,4 @@
-import mongodb from 'mongodb'
+import mongodb, { MongoClient } from 'mongodb'
 import { Node, Schema } from 'prosemirror-model'
 import { EditorState } from 'prosemirror-state'
 
@@ -27,16 +27,22 @@ export default class DB {
   }
 
   constructor(options: DBOptions) {
-    const db = new mongodb.MongoClient(options.uri, {
+    this.client = new mongodb.MongoClient(options.uri, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     })
+    this.collectionPaper = this.client
       .connect()
       .then(client => client.db(options.database))
-    this.collectionPaper = db.then(db => db.collection(options.collectionPaper))
+      .then(db => db.collection(options.collectionPaper))
   }
 
+  private client: MongoClient
   private collectionPaper: Promise<mongodb.Collection>
+
+  async destroy() {
+    await this.client.close()
+  }
 
   async selectPaper(
     paperId: string,

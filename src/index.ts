@@ -92,6 +92,13 @@ program
       autoReleaseInstanceWait,
       maxBufferSize,
     }) => {
+      IPFS.initShared({
+        path: ipfsRepoPath,
+        gateway: {
+          port: ipfsGatewayPort,
+        },
+      })
+
       DB.initShared({
         uri: mongoUri,
         database: mongoDatabase,
@@ -103,8 +110,7 @@ program
         autoReleaseInstanceWaitMilliseconds: autoReleaseInstanceWait,
       })
 
-      const ipfs = new IPFS({ path: ipfsRepoPath, gateway: { port: ipfsGatewayPort } })
-      await ipfs.startHttpGateway()
+      await IPFS.shared.startHttpGateway()
       console.info(`IPFS gateway started on port ${ipfsGatewayPort}`)
 
       const io = new Server<IOListenEvents, IOEmitEvents>(port, {
@@ -178,12 +184,12 @@ program
           socket.on('createFile', async ({ source }, cb) => {
             if (Array.isArray(source)) {
               const hash: string[] = []
-              for await (const r of await ipfs.addAll(source)) {
+              for await (const r of await IPFS.shared.addAll(source)) {
                 hash.push(r.cid.toString())
               }
               cb({ hash })
             } else {
-              const { cid } = await ipfs.add(source)
+              const { cid } = await IPFS.shared.add(source)
               cb({ hash: [cid.toString()] })
             }
           })
@@ -231,6 +237,12 @@ program.parse(process.argv)
 
 process.on('uncaughtException', e => {
   console.error(e)
+})
+
+process.on('SIGINT', async () => {
+  await Instance.destroy()
+  await DB.shared.destroy()
+  await IPFS.shared.destroy()
 })
 
 function createIntParser(min: number, max: number, message: (value: string) => string) {

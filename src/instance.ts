@@ -56,6 +56,12 @@ export default class Instance extends StrictEventEmitter<
     )
   }
 
+  static async destroy() {
+    for (const [_, instance] of this.shared) {
+      await (await instance).dispose()
+    }
+  }
+
   private static _options: InstanceOptions
   private static get options() {
     if (!this._options) {

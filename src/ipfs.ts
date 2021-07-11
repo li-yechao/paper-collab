@@ -10,6 +10,21 @@ export interface IPFSOptions {
 }
 
 export default class IPFS {
+  private static _shared: IPFS
+
+  static get shared() {
+    if (!this._shared) {
+      if (!this._shared) {
+        throw new Error('Please call IPFS.initShared() first')
+      }
+    }
+    return this._shared
+  }
+
+  static initShared(options: IPFSOptions) {
+    this._shared = new IPFS(options)
+  }
+
   constructor(options: IPFSOptions) {
     this._ipfs = ipfs.create({
       repo: options.path,
@@ -24,6 +39,11 @@ export default class IPFS {
 
   private _ipfs: Promise<ipfs.IPFS>
   private _httpGateway?: Promise<HttpGateway>
+
+  async destroy() {
+    await (await this._ipfs).stop()
+    await (await this._httpGateway)?.stop()
+  }
 
   async startHttpGateway() {
     if (!this._httpGateway) {
