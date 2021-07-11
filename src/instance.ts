@@ -1,7 +1,6 @@
 import debounce from 'lodash/debounce'
 import { Node, Schema } from 'prosemirror-model'
 import { Step } from 'prosemirror-transform'
-import Config from './config'
 import DB, { DocJson, Version } from './db'
 import { schema } from './schema'
 import { StrictEventEmitter } from './typed-events'
@@ -33,6 +32,17 @@ export default class Instance extends StrictEventEmitter<
       this.shared.set(this.key(id), instance)
     }
     return instance
+  }
+
+  private static _options: { autoSaveWaitMilliseconds: number }
+  private static get options() {
+    if (!this._options) {
+      throw new Error('Please call Instance.initShared() first')
+    }
+    return this._options
+  }
+  static initShared(options: { autoSaveWaitMilliseconds: number }) {
+    this._options = options
   }
 
   constructor(options: {
@@ -135,5 +145,5 @@ export default class Instance extends StrictEventEmitter<
 
   private autoSave = debounce(() => {
     this.save()
-  }, Config.shared.autoSaveWaitMilliseconds)
+  }, Instance.options.autoSaveWaitMilliseconds)
 }

@@ -1,7 +1,6 @@
 import mongodb from 'mongodb'
 import { Node, Schema } from 'prosemirror-model'
 import { EditorState } from 'prosemirror-state'
-import Config from './config'
 
 export type Version = number
 
@@ -17,13 +16,14 @@ export default class DB {
   private static _shared: DB
   static get shared() {
     if (!this._shared) {
-      this._shared = new DB({
-        uri: Config.shared.mongoUri,
-        database: Config.shared.mongoDatabase,
-        collectionPaper: Config.shared.mongoCollectionPaper,
-      })
+      if (!this._shared) {
+        throw new Error('Please call DB.initShared() first')
+      }
     }
     return this._shared
+  }
+  static initShared(config: DBOptions) {
+    this._shared = new DB(config)
   }
 
   constructor(options: DBOptions) {

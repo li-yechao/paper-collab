@@ -1,17 +1,26 @@
 import { program } from 'commander'
 import jsonwebtoken from 'jsonwebtoken'
 import { Server, Socket } from 'socket.io'
-import Config from './config'
-import { DocJson, Version } from './db'
+import DB, { DocJson, Version } from './db'
 import Instance, { ClientID } from './instance'
+import IPFS from './ipfs'
+
+export interface CreateFileSource {
+  path: string
+  content: ArrayBuffer
+}
 
 export interface IOListenEvents {
   transaction: (e: { version: Version; steps: DocJson[] }) => void
   save: () => void
+  createFile: (
+    e: { source: CreateFileSource | CreateFileSource[] },
+    cb: (e: { hash: string[] }) => void
+  ) => void
 }
 
 export interface IOEmitEvents {
-  paper: (e: { clientID: ClientID; version: Version; doc: DocJson }) => void
+  paper: (e: { clientID: ClientID; version: Version; doc: DocJson; ipfsGatewayUri: string }) => void
   transaction: (e: { version: Version; steps: DocJson[]; clientIDs: ClientID[] }) => void
   persistence: (e: { version: Version; updatedAt: number }) => void
 }
@@ -29,26 +38,66 @@ program.name('paper-collab')
 program
   .command('serve')
   .description('Start collab server')
-  .option('-p, --port [port]', 'Listening port', '8080')
+  .option(
+    '-p, --port [port]',
+    'Listening port',
+    createIntParser(0, 65535, v => `Invalid port ${v}`),
+    8080
+  )
+  .option(
+    '--ipfs-gateway-port [port]',
+    'IPFS gateway listening port',
+    createIntParser(0, 65535, v => `Invalid ipfs gateway port ${v}`),
+    8081
+  )
+  .requiredOption('--ipfs-gateway-uri [uri]', 'IPFS gateway uri, like https://example.com/ipfs')
+  .requiredOption('--ipfs-repo-path [path]', 'IPFS repo path')
   .requiredOption('--access-token-secret [secret]', 'Access token secret')
-  .option('--auto-save-wait [milliseconds]', 'Auto save wait milliseconds', '5000')
+  .option(
+    '--auto-save-wait [milliseconds]',
+    'Auto save wait milliseconds',
+    createIntParser(0, Number.MAX_SAFE_INTEGER, v => `Invalid auto save wait milliseconds ${v}`),
+    5000
+  )
   .requiredOption('--mongo-uri [uri]', 'Mongodb uri')
   .requiredOption('--mongo-database [database]', 'Mongodb database name')
   .requiredOption('--mongo-collection-paper [collection]', 'Mongodb paper collection name')
+  .option(
+    '--max-buffer-size [buffer size]',
+    'Max buffer size',
+    createIntParser(0, Number.MAX_SAFE_INTEGER, v => `Invalid max buffer size ${v}`),
+    1 << 20
+  )
   .action(
-    ({ port, accessTokenSecret, mongoUri, mongoDatabase, mongoCollectionPaper, autoSaveWait }) => {
-      Config.initShared({
-        port: Number(port),
-        accessTokenSecret,
-        mongoUri,
-        mongoDatabase,
-        mongoCollectionPaper,
-        autoSaveWaitMilliseconds: Number(autoSaveWait),
+    async ({
+      port,
+      ipfsGatewayPort,
+      ipfsGatewayUri,
+      ipfsRepoPath,
+      accessTokenSecret,
+      mongoUri,
+      mongoDatabase,
+      mongoCollectionPaper,
+      autoSaveWait,
+      maxBufferSize,
+    }) => {
+      DB.initShared({
+        uri: mongoUri,
+        database: mongoDatabase,
+        collectionPaper: mongoCollectionPaper,
       })
 
-      const io = new Server<IOListenEvents, IOEmitEvents>(Config.shared.port, { cors: {} })
+      Instance.initShared({ autoSaveWaitMilliseconds: autoSaveWait })
 
-      console.info(`Paper collab server started on port ${Config.shared.port}`)
+      const ipfs = new IPFS({ path: ipfsRepoPath, gateway: { port: ipfsGatewayPort } })
+      await ipfs.startHttpGateway()
+      console.info(`IPFS gateway started on port ${ipfsGatewayPort}`)
+
+      const io = new Server<IOListenEvents, IOEmitEvents>(port, {
+        cors: {},
+        maxHttpBufferSize: maxBufferSize,
+      })
+      console.info(`Paper collab server started on port ${port}`)
 
       io.sockets.adapter.on('create-room', async room => {
         const key = Instance.keyInfo(room)
@@ -62,7 +111,7 @@ program
         console.info(`Client connected ${socket.handshake.address}`)
 
         try {
-          const token = getToken(socket, Config.shared.accessTokenSecret)
+          const token = getToken(socket, accessTokenSecret)
           const { paperId } = socket.handshake.query
           if (token.paper_id !== paperId) {
             throw new Error(`Forbidden access paper ${paperId}`)
@@ -74,7 +123,7 @@ program
 
           const { doc, version } = instance
           socket.data.version = version
-          socket.emit('paper', { clientID: socket.id, version, doc: doc.toJSON() })
+          socket.emit('paper', { clientID: socket.id, version, doc: doc.toJSON(), ipfsGatewayUri })
           socket.emit('persistence', instance.persistence)
 
           socket.on('transaction', async ({ version, steps }) => {
@@ -101,6 +150,21 @@ program
             }
 
             instance.save()
+          })
+          socket.on('createFile', async ({ source }, cb) => {
+            if (Array.isArray(source)) {
+              const hash: string[] = []
+              for await (const r of await ipfs.addAll(source)) {
+                hash.push(r.cid.toString())
+              }
+              cb({ hash })
+            } else {
+              const { cid } = await ipfs.add(source)
+              cb({ hash: [cid.toString()] })
+            }
+          })
+          socket.on('error', error => {
+            console.error(error)
           })
         } catch (error) {
           console.error(error)
@@ -144,3 +208,13 @@ program.parse(process.argv)
 process.on('uncaughtException', e => {
   console.error(e)
 })
+
+function createIntParser(min: number, max: number, message: (value: string) => string) {
+  return (value: string) => {
+    const n = parseInt(value)
+    if (!Number.isSafeInteger(n) || n <= min || n >= max) {
+      throw new Error(message(value))
+    }
+    return n
+  }
+}
