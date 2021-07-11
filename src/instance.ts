@@ -7,12 +7,18 @@ import { StrictEventEmitter } from './typed-events'
 
 export type ClientID = string | number
 
+export interface InstanceOptions {
+  autoSaveWaitMilliseconds: number
+  autoReleaseInstanceWaitMilliseconds: number
+}
+
 export default class Instance extends StrictEventEmitter<
   {},
   {},
   { persistence: (e: { version: Version; updatedAt: number }) => void }
 > {
   private static shared = new Map<string, Promise<Instance>>()
+  private static gcTimerMap = new Map<string, NodeJS.Timeout>()
   static key = (id: { paperId: string }) => `paper-${id.paperId}`
   static keyInfo(key: string) {
     const { paperId } = key.match(/^paper-(?<paperId>[\d|a-f]+)$/)?.groups ?? {}
@@ -33,15 +39,31 @@ export default class Instance extends StrictEventEmitter<
     }
     return instance
   }
+  static markInstanceGC(id: { paperId: string }) {
+    const key = this.key(id)
 
-  private static _options: { autoSaveWaitMilliseconds: number }
+    const timer = this.gcTimerMap.get(key)
+    timer && clearTimeout(timer)
+    this.gcTimerMap.set(
+      key,
+      setTimeout(async () => {
+        if (this.shared.has(key)) {
+          const instance = this.shared.get(key)!
+          this.shared.delete(key)
+          await (await instance).dispose()
+        }
+      }, this.options.autoReleaseInstanceWaitMilliseconds)
+    )
+  }
+
+  private static _options: InstanceOptions
   private static get options() {
     if (!this._options) {
       throw new Error('Please call Instance.initShared() first')
     }
     return this._options
   }
-  static initShared(options: { autoSaveWaitMilliseconds: number }) {
+  static initShared(options: InstanceOptions) {
     this._options = options
   }
 
@@ -135,6 +157,11 @@ export default class Instance extends StrictEventEmitter<
     } finally {
       this._saving = false
     }
+  }
+
+  async dispose() {
+    await this.save()
+    this.removeAllListeners()
   }
 
   private checkVersion(version: number) {

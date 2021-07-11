@@ -59,6 +59,16 @@ program
     createIntParser(0, Number.MAX_SAFE_INTEGER, v => `Invalid auto save wait milliseconds ${v}`),
     5000
   )
+  .option(
+    '--auto-release-instance-wait [milliseconds]',
+    'Auto release instance wait milliseconds',
+    createIntParser(
+      0,
+      Number.MAX_SAFE_INTEGER,
+      v => `Invalid auto release instance wait milliseconds ${v}`
+    ),
+    60000
+  )
   .requiredOption('--mongo-uri [uri]', 'Mongodb uri')
   .requiredOption('--mongo-database [database]', 'Mongodb database name')
   .requiredOption('--mongo-collection-paper [collection]', 'Mongodb paper collection name')
@@ -79,6 +89,7 @@ program
       mongoDatabase,
       mongoCollectionPaper,
       autoSaveWait,
+      autoReleaseInstanceWait,
       maxBufferSize,
     }) => {
       DB.initShared({
@@ -87,7 +98,10 @@ program
         collectionPaper: mongoCollectionPaper,
       })
 
-      Instance.initShared({ autoSaveWaitMilliseconds: autoSaveWait })
+      Instance.initShared({
+        autoSaveWaitMilliseconds: autoSaveWait,
+        autoReleaseInstanceWaitMilliseconds: autoReleaseInstanceWait,
+      })
 
       const ipfs = new IPFS({ path: ipfsRepoPath, gateway: { port: ipfsGatewayPort } })
       await ipfs.startHttpGateway()
@@ -99,16 +113,23 @@ program
       })
       console.info(`Paper collab server started on port ${port}`)
 
-      io.sockets.adapter.on('create-room', async room => {
-        const key = Instance.keyInfo(room)
-        if (key) {
-          const instance = await Instance.getInstance(key)
-          // NOTE: One instance only map to one room.
-          // So we can remove all listeners of the instance.
-          instance.removeAllListeners('persistence')
-          instance.on('persistence', e => io.in(room).emit('persistence', e))
-        }
-      })
+      io.sockets.adapter
+        .on('create-room', async room => {
+          const key = Instance.keyInfo(room)
+          if (key) {
+            const instance = await Instance.getInstance(key)
+            // NOTE: One instance only map to one room.
+            // So we can remove all listeners of the instance.
+            instance.removeAllListeners('persistence')
+            instance.on('persistence', e => io.in(room).emit('persistence', e))
+          }
+        })
+        .on('delete-room', async room => {
+          const key = Instance.keyInfo(room)
+          if (key) {
+            Instance.markInstanceGC(key)
+          }
+        })
 
       io.on('connection', async socket => {
         console.info(`Client connected ${socket.handshake.address}`)
