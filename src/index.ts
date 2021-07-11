@@ -103,6 +103,9 @@ program
         const key = Instance.keyInfo(room)
         if (key) {
           const instance = await Instance.getInstance(key)
+          // NOTE: One instance only map to one room.
+          // So we can remove all listeners of the instance.
+          instance.removeAllListeners('persistence')
           instance.on('persistence', e => io.in(room).emit('persistence', e))
         }
       })
