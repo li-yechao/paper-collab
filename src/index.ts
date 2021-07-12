@@ -203,6 +203,24 @@ program
           return
         }
       })
+
+      process.on('SIGINT', async () => {
+        try {
+          io.sockets.disconnectSockets(true)
+          await new Promise<void>((resolve, reject) =>
+            io.close(err => (err ? reject(err) : resolve()))
+          )
+          await Instance.destroy()
+          await DB.shared.destroy()
+          await IPFS.shared.destroy()
+          console.info('Stop server success')
+          process.exit(0)
+        } catch (error) {
+          console.info('Stop server failure')
+          console.error(error)
+          process.exit(1)
+        }
+      })
     }
   )
 
@@ -237,12 +255,6 @@ program.parse(process.argv)
 
 process.on('uncaughtException', e => {
   console.error(e)
-})
-
-process.on('SIGINT', async () => {
-  await Instance.destroy()
-  await DB.shared.destroy()
-  await IPFS.shared.destroy()
 })
 
 function createIntParser(min: number, max: number, message: (value: string) => string) {
