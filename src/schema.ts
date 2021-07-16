@@ -80,13 +80,13 @@ export const schema = new Schema({
         naturalHeight: { default: null },
         thumbnail: { default: null },
       },
-      content: 'image_block_content',
+      content: 'image_block_caption',
       marks: '',
       group: 'block',
       draggable: true,
       isolating: true,
     },
-    image_block_content: {
+    image_block_caption: {
       content: 'text*',
       marks: '',
     },
@@ -99,13 +99,13 @@ export const schema = new Schema({
         poster: { default: null },
         dashArchiveSrc: { default: null },
       },
-      content: 'video_block_content',
+      content: 'video_block_caption',
       marks: '',
       group: 'block',
       draggable: true,
       isolating: true,
     },
-    video_block_content: {
+    video_block_caption: {
       content: 'text*',
       marks: '',
     },
