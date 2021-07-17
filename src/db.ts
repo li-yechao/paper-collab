@@ -62,34 +62,6 @@ export default class DB {
     paperId: string,
     schema: Schema
   ): Promise<{ title: string | null; doc: Node; version: Version; updatedAt: number }> {
-    const { title, doc, version, updatedAt } = await this._selectPaper(paperId)
-    return {
-      title,
-      doc: (doc && Node.fromJSON(schema, doc)) || EditorState.create({ schema }).doc,
-      version: version ?? 0,
-      updatedAt,
-    }
-  }
-
-  async updatePaper({
-    paperId,
-    doc,
-    version,
-  }: {
-    paperId: string
-    doc: Node
-    version: Version
-  }): Promise<{ updatedAt: number }> {
-    const title = doc.firstChild?.type.name === 'title' ? doc.firstChild.textContent : ''
-    return await this._updatePaper({ paperId, title, doc: doc.toJSON(), version })
-  }
-
-  private async _selectPaper(paperId: string): Promise<{
-    title: string | null
-    doc: DocJson | null
-    version: Version | null
-    updatedAt: number
-  }> {
     const paper = await (
       await this.collectionPaper
     ).findOne<{
@@ -108,30 +80,45 @@ export default class DB {
 
     return {
       title: paper.title,
-      doc: paper.doc,
-      version: paper.version,
+      doc: (paper.doc && Node.fromJSON(schema, paper.doc)) || EditorState.create({ schema }).doc,
+      version: paper.version ?? 0,
       updatedAt: paper.updated_at,
     }
   }
 
-  private async _updatePaper({
+  async updatePaper({
     paperId,
-    title,
     doc,
     version,
   }: {
     paperId: string
-    title: string
-    doc: DocJson
+    doc: Node
     version: Version
   }): Promise<{ updatedAt: number }> {
-    const updatedAt = Date.now()
+    const title = doc.firstChild?.type.name === 'title' ? doc.firstChild.textContent : ''
+    const tags: string[] = []
+    const tagList = doc.maybeChild(1)
+    if (tagList?.type.name === 'tag_list') {
+      tagList.forEach(node => {
+        const tag = node.textContent.trim()
+        tag && tags.push(tag)
+      })
+    }
 
+    const updatedAt = Date.now()
     await (
       await this.collectionPaper
     ).findOneAndUpdate(
       { _id: paperId },
-      { $set: { updated_at: mongodb.Long.fromNumber(updatedAt), title, doc, version } }
+      {
+        $set: {
+          updated_at: mongodb.Long.fromNumber(updatedAt),
+          title,
+          doc: doc.toJSON(),
+          version,
+          tags,
+        },
+      }
     )
     return { updatedAt }
   }

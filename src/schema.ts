@@ -17,7 +17,7 @@ import { Schema } from 'prosemirror-model'
 export const schema = new Schema({
   nodes: {
     doc: {
-      content: 'title block+',
+      content: 'title tag_list block+',
     },
     text: {
       group: 'inline',
@@ -106,6 +106,14 @@ export const schema = new Schema({
       isolating: true,
     },
     video_block_caption: {
+      content: 'text*',
+      marks: '',
+    },
+    tag_list: {
+      content: `tag_item+`,
+      marks: '',
+    },
+    tag_item: {
       content: 'text*',
       marks: '',
     },
