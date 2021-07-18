@@ -93,12 +93,14 @@ export default class Instance extends StrictEventEmitter<
     doc: Node
     version: Version
     updatedAt: number
+    tags: string[] | null
   }) {
     super()
     this.schema = options.schema
     this.paperId = options.paperId
     this.doc = options.doc
     this.version = options.version
+    this.tags = options.tags ?? []
     this._persistence = { version: options.version, updatedAt: options.updatedAt }
   }
 
@@ -106,6 +108,7 @@ export default class Instance extends StrictEventEmitter<
   paperId: string
   doc: Node
   version: Version
+  tags: string[]
   steps: (Step & { clientID: ClientID })[] = []
 
   private _saving = false
@@ -119,6 +122,14 @@ export default class Instance extends StrictEventEmitter<
       this._persistence = v
       this.emitReserved('persistence', v)
     }
+  }
+
+  get isPublic() {
+    return this.tags.includes('public')
+  }
+
+  get isWritable() {
+    return this.tags.includes('writable')
   }
 
   addEvents(version: Version, steps: DocJson[], clientID: ClientID): { version: Version } {
@@ -169,8 +180,10 @@ export default class Instance extends StrictEventEmitter<
     try {
       const { version } = this
       if (version > this.persistence.version) {
+        const { updatedAt, tags } = await DB.shared.updatePaper(this)
+        this.tags = tags
         this.persistence = {
-          ...(await DB.shared.updatePaper(this)),
+          updatedAt,
           version,
         }
       }

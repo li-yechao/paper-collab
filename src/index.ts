@@ -34,9 +34,15 @@ export interface IOListenEvents {
 }
 
 export interface IOEmitEvents {
-  paper: (e: { clientID: ClientID; version: Version; doc: DocJson; ipfsGatewayUri: string }) => void
+  paper: (e: {
+    clientID: ClientID
+    version: Version
+    doc: DocJson
+    ipfsGatewayUri: string
+    writable: boolean
+  }) => void
   transaction: (e: { version: Version; steps: DocJson[]; clientIDs: ClientID[] }) => void
-  persistence: (e: { version: Version; updatedAt: number }) => void
+  persistence: (e: { version: Version; updatedAt: number; writable: boolean }) => void
 }
 
 export interface AccessTokenPayload {
@@ -141,7 +147,11 @@ program
             // NOTE: One instance only map to one room.
             // So we can remove all listeners of the instance.
             instance.removeAllListeners('persistence')
-            instance.on('persistence', e => io.in(room).emit('persistence', e))
+            instance.on('persistence', async e => {
+              for (const s of await io.in(room).fetchSockets()) {
+                s.emit('persistence', { ...e, writable: s.data.writable() })
+              }
+            })
           }
         })
         .on('delete-room', async room => {
@@ -155,24 +165,41 @@ program
         console.info(`Client connected ${socket.handshake.address}`)
 
         try {
-          const token = getToken(socket, accessTokenSecret)
           const { paperId } = socket.handshake.query
-          if (token.paper_id !== paperId) {
-            throw new Error(`Forbidden access paper ${paperId}`)
+          if (typeof paperId !== 'string') {
+            throw new Error(`Invalid parameter paperId ${paperId}`)
           }
 
           const key = Instance.key({ paperId })
           socket.join(key)
           const instance = await Instance.getInstance({ paperId })
 
+          socket.data.token = getToken(socket, accessTokenSecret)
+          socket.data.writable = () => {
+            return instance.isWritable || socket.data.token?.read_only === false
+          }
+          socket.data.readable = () => {
+            return instance.isPublic || socket.data.token?.paper_id === paperId
+          }
+
+          if (!socket.data.readable()) {
+            throw new Error(`Forbidden access paper ${paperId}`)
+          }
+
           const { doc, version } = instance
           socket.data.version = version
-          socket.emit('paper', { clientID: socket.id, version, doc: doc.toJSON(), ipfsGatewayUri })
-          socket.emit('persistence', instance.persistence)
+          socket.emit('paper', {
+            clientID: socket.id,
+            version,
+            doc: doc.toJSON(),
+            ipfsGatewayUri,
+            writable: socket.data.writable(),
+          })
+          socket.emit('persistence', { ...instance.persistence, writable: socket.data.writable() })
 
           socket.on('transaction', async ({ version, steps }) => {
-            if (!token.read_only) {
-              throw new Error(`ReadOnly can not write anything`)
+            if (!socket.data.writable()) {
+              throw new Error(`Can not write anything`)
             }
 
             const e = instance.addEvents(version, steps, socket.id)
@@ -189,7 +216,7 @@ program
             }
           })
           socket.on('save', () => {
-            if (!token.read_only) {
+            if (!socket.data.writable()) {
               throw new Error(`ReadOnly can not write anything`)
             }
 
@@ -238,10 +265,10 @@ program
     }
   )
 
-function getToken(socket: Socket, secret: jsonwebtoken.Secret): AccessTokenPayload {
+function getToken(socket: Socket, secret: jsonwebtoken.Secret): AccessTokenPayload | undefined {
   const { authorization } = socket.handshake.headers
   if (!authorization) {
-    throw new Error('Required header Authorization is not present')
+    return
   }
   if (!authorization.startsWith('Bearer ')) {
     throw new Error('Invalid token type')

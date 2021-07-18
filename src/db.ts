@@ -61,7 +61,13 @@ export default class DB {
   async selectPaper(
     paperId: string,
     schema: Schema
-  ): Promise<{ title: string | null; doc: Node; version: Version; updatedAt: number }> {
+  ): Promise<{
+    title: string | null
+    doc: Node
+    version: Version
+    updatedAt: number
+    tags: string[] | null
+  }> {
     const paper = await (
       await this.collectionPaper
     ).findOne<{
@@ -69,9 +75,10 @@ export default class DB {
       doc: DocJson | null
       updated_at: number
       version: Version | null
+      tags: string[] | null
     }>(
       { _id: paperId },
-      { projection: { title: true, doc: true, updated_at: true, version: true } }
+      { projection: { title: true, doc: true, updated_at: true, version: true, tags: true } }
     )
 
     if (!paper) {
@@ -83,6 +90,7 @@ export default class DB {
       doc: (paper.doc && Node.fromJSON(schema, paper.doc)) || EditorState.create({ schema }).doc,
       version: paper.version ?? 0,
       updatedAt: paper.updated_at,
+      tags: paper.tags,
     }
   }
 
@@ -94,7 +102,7 @@ export default class DB {
     paperId: string
     doc: Node
     version: Version
-  }): Promise<{ updatedAt: number }> {
+  }): Promise<{ updatedAt: number; tags: string[] }> {
     const title = doc.firstChild?.type.name === 'title' ? doc.firstChild.textContent : ''
     const tags: string[] = []
     const tagList = doc.maybeChild(1)
@@ -120,6 +128,6 @@ export default class DB {
         },
       }
     )
-    return { updatedAt }
+    return { updatedAt, tags }
   }
 }
