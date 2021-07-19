@@ -39,10 +39,16 @@ export interface IOEmitEvents {
     version: Version
     doc: DocJson
     ipfsGatewayUri: string
+    readable: boolean
     writable: boolean
   }) => void
   transaction: (e: { version: Version; steps: DocJson[]; clientIDs: ClientID[] }) => void
-  persistence: (e: { version: Version; updatedAt: number; writable: boolean }) => void
+  persistence: (e: {
+    version: Version
+    updatedAt: number
+    readable: boolean
+    writable: boolean
+  }) => void
 }
 
 export interface AccessTokenPayload {
@@ -149,7 +155,11 @@ program
             instance.removeAllListeners('persistence')
             instance.on('persistence', async e => {
               for (const s of await io.in(room).fetchSockets()) {
-                s.emit('persistence', { ...e, writable: s.data.writable() })
+                s.emit('persistence', {
+                  ...e,
+                  readable: s.data.readable(),
+                  writable: s.data.writable(),
+                })
               }
             })
           }
@@ -193,9 +203,14 @@ program
             version,
             doc: doc.toJSON(),
             ipfsGatewayUri,
+            readable: socket.data.readable(),
             writable: socket.data.writable(),
           })
-          socket.emit('persistence', { ...instance.persistence, writable: socket.data.writable() })
+          socket.emit('persistence', {
+            ...instance.persistence,
+            readable: socket.data.readable(),
+            writable: socket.data.writable(),
+          })
 
           socket.on('transaction', async ({ version, steps }) => {
             if (!socket.data.writable()) {
