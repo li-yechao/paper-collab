@@ -50,7 +50,7 @@ export interface AccessTokenPayload {
   exp: number
   sub: string
   paper_id: string
-  read_only?: boolean
+  writable?: boolean
 }
 
 program.name('paper-collab')
@@ -176,7 +176,7 @@ program
 
           socket.data.token = getToken(socket, accessTokenSecret)
           socket.data.writable = () => {
-            return instance.isWritable || socket.data.token?.read_only === false
+            return instance.isWritable || socket.data.token?.writable === true
           }
           socket.data.readable = () => {
             return instance.isPublic || socket.data.token?.paper_id === paperId
@@ -286,7 +286,7 @@ function getToken(socket: Socket, secret: jsonwebtoken.Secret): AccessTokenPaylo
       exp: payload.exp,
       sub: payload.sub,
       paper_id: payload.paper_id,
-      read_only: typeof payload.read_only === 'boolean' ? payload.read_only : true,
+      writable: typeof payload.writable === 'boolean' ? payload.writable : false,
     }
   }
   throw new Error('Unsupported token')
