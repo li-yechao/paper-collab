@@ -34,6 +34,7 @@ export interface IOListenEvents {
 }
 
 export interface IOEmitEvents {
+  error: (e: { message: string }) => void
   paper: (e: {
     clientID: ClientID
     version: Version
@@ -177,7 +178,7 @@ program
         try {
           const { paperId } = socket.handshake.query
           if (typeof paperId !== 'string') {
-            throw new Error(`Invalid parameter paperId ${paperId}`)
+            throw new Error(`Invalid paperId ${paperId}`)
           }
 
           const key = Instance.key({ paperId })
@@ -193,7 +194,7 @@ program
           }
 
           if (!socket.data.readable()) {
-            throw new Error(`Forbidden access paper ${paperId}`)
+            throw new Error('Forbidden')
           }
 
           const { doc, version } = instance
@@ -249,12 +250,9 @@ program
               cb({ hash: [cid.toString()] })
             }
           })
-          socket.on('error', error => {
-            console.error(error)
-          })
         } catch (error) {
           console.error(error)
-          socket._error(error.message)
+          socket.emit('error', { message: error.message })
           socket.disconnect()
           return
         }
