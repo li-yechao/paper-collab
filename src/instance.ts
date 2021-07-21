@@ -101,6 +101,7 @@ export default class Instance extends StrictEventEmitter<
     this.doc = options.doc
     this.version = options.version
     this.tags = options.tags ?? []
+    this.key = Instance.key({ paperId: options.paperId })
     this._persistence = { version: options.version, updatedAt: options.updatedAt }
   }
 
@@ -110,6 +111,7 @@ export default class Instance extends StrictEventEmitter<
   version: Version
   tags: string[]
   steps: (Step & { clientID: ClientID })[] = []
+  key: string
 
   private _saving = false
 

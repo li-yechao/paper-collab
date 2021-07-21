@@ -13,52 +13,12 @@
 // limitations under the License.
 
 import { program } from 'commander'
-import jsonwebtoken from 'jsonwebtoken'
-import { Server, Socket } from 'socket.io'
-import DB, { DocJson, Version } from './db'
-import Instance, { ClientID } from './instance'
+import { Server } from 'socket.io'
+import Client from './client'
+import DB from './db'
+import Instance from './instance'
+import { IOEmitEvents, IOListenEvents, RemoteSocket } from './io'
 import IPFS from './ipfs'
-
-export interface CreateFileSource {
-  path: string
-  content: ArrayBuffer
-}
-
-export interface IOListenEvents {
-  transaction: (e: { version: Version; steps: DocJson[] }) => void
-  save: () => void
-  createFile: (
-    e: { source: CreateFileSource | CreateFileSource[] },
-    cb: (e: { hash: string[] }) => void
-  ) => void
-}
-
-export interface IOEmitEvents {
-  error: (e: { message: string }) => void
-  paper: (e: {
-    clientID: ClientID
-    version: Version
-    doc: DocJson
-    ipfsGatewayUri: string
-    readable: boolean
-    writable: boolean
-  }) => void
-  transaction: (e: { version: Version; steps: DocJson[]; clientIDs: ClientID[] }) => void
-  persistence: (e: {
-    version: Version
-    updatedAt: number
-    readable: boolean
-    writable: boolean
-  }) => void
-}
-
-export interface AccessTokenPayload {
-  iat: number
-  exp: number
-  sub: string
-  paper_id: string
-  writable?: boolean
-}
 
 program.name('paper-collab')
 
@@ -146,6 +106,11 @@ program
       })
       console.info(`Paper collab server started on port ${port}`)
 
+      io.on('connection', async socket => {
+        console.info(`Client connected ${socket.handshake.address}`)
+        Client.setup(socket, { ipfsGatewayUri, accessTokenSecret })
+      })
+
       io.sockets.adapter
         .on('create-room', async room => {
           const key = Instance.keyInfo(room)
@@ -154,13 +119,11 @@ program
             // NOTE: One instance only map to one room.
             // So we can remove all listeners of the instance.
             instance.removeAllListeners('persistence')
-            instance.on('persistence', async e => {
-              for (const s of await io.in(room).fetchSockets()) {
-                s.emit('persistence', {
-                  ...e,
-                  readable: s.data.readable(),
-                  writable: s.data.writable(),
-                })
+            instance.on('persistence', async () => {
+              const sockets: RemoteSocket<{ client: Client }>[] = await io.in(room).fetchSockets()
+
+              for (const s of sockets) {
+                s.data.client.emitPersistence()
               }
             })
           }
@@ -172,94 +135,9 @@ program
           }
         })
 
-      io.on('connection', async socket => {
-        console.info(`Client connected ${socket.handshake.address}`)
-
-        try {
-          const { paperId } = socket.handshake.query
-          if (typeof paperId !== 'string') {
-            throw new Error(`Invalid paperId ${paperId}`)
-          }
-
-          const key = Instance.key({ paperId })
-          socket.join(key)
-          const instance = await Instance.getInstance({ paperId })
-
-          socket.data.token = getToken(socket, accessTokenSecret)
-          socket.data.writable = () => {
-            return instance.isWritable || socket.data.token?.writable === true
-          }
-          socket.data.readable = () => {
-            return instance.isPublic || socket.data.token?.paper_id === paperId
-          }
-
-          if (!socket.data.readable()) {
-            throw new Error('Forbidden')
-          }
-
-          const { doc, version } = instance
-          socket.data.version = version
-          socket.emit('paper', {
-            clientID: socket.id,
-            version,
-            doc: doc.toJSON(),
-            ipfsGatewayUri,
-            readable: socket.data.readable(),
-            writable: socket.data.writable(),
-          })
-          socket.emit('persistence', {
-            ...instance.persistence,
-            readable: socket.data.readable(),
-            writable: socket.data.writable(),
-          })
-
-          socket.on('transaction', async ({ version, steps }) => {
-            if (!socket.data.writable()) {
-              throw new Error(`Can not write anything`)
-            }
-
-            const e = instance.addEvents(version, steps, socket.id)
-            socket.data.version = e.version
-
-            for (const s of await socket.in(key).fetchSockets()) {
-              const e = instance.getEvents(s.data.version)
-              if (e) {
-                const { version, steps } = e
-                const clientIDs = steps.map(i => i.clientID)
-                s.data.version = version
-                s.emit('transaction', { version, steps, clientIDs })
-              }
-            }
-          })
-          socket.on('save', () => {
-            if (!socket.data.writable()) {
-              throw new Error(`ReadOnly can not write anything`)
-            }
-
-            instance.save()
-          })
-          socket.on('createFile', async ({ source }, cb) => {
-            if (Array.isArray(source)) {
-              const hash: string[] = []
-              for await (const r of await IPFS.shared.addAll(source)) {
-                hash.push(r.cid.toString())
-              }
-              cb({ hash })
-            } else {
-              const { cid } = await IPFS.shared.add(source)
-              cb({ hash: [cid.toString()] })
-            }
-          })
-        } catch (error) {
-          console.error(error)
-          socket.emit('error', { message: error.message })
-          socket.disconnect()
-          return
-        }
-      })
-
       process.on('SIGINT', async () => {
         try {
+          io.removeAllListeners()
           io.sockets.disconnectSockets(true)
           await new Promise<void>((resolve, reject) =>
             io.close(err => (err ? reject(err) : resolve()))
@@ -277,33 +155,6 @@ program
       })
     }
   )
-
-function getToken(socket: Socket, secret: jsonwebtoken.Secret): AccessTokenPayload | undefined {
-  const { authorization } = socket.handshake.headers
-  if (!authorization) {
-    return
-  }
-  if (!authorization.startsWith('Bearer ')) {
-    throw new Error('Invalid token type')
-  }
-  const payload = jsonwebtoken.verify(authorization.replace(/^Bearer\s/, ''), secret)
-  if (
-    typeof payload === 'object' &&
-    typeof payload.iat === 'number' &&
-    typeof payload.exp === 'number' &&
-    typeof payload.sub === 'string' &&
-    typeof payload.paper_id === 'string'
-  ) {
-    return {
-      iat: payload.iat,
-      exp: payload.exp,
-      sub: payload.sub,
-      paper_id: payload.paper_id,
-      writable: typeof payload.writable === 'boolean' ? payload.writable : false,
-    }
-  }
-  throw new Error('Unsupported token')
-}
 
 program.parse(process.argv)
 
