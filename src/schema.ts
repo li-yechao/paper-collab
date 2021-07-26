@@ -49,14 +49,17 @@ export const schema = new Schema({
       content: 'paragraph block*',
     },
     ordered_list: {
-      content: 'list_item+',
+      content: 'ordered_item+',
       group: 'block',
+    },
+    ordered_item: {
+      content: 'paragraph block*',
     },
     bullet_list: {
-      content: 'list_item+',
+      content: 'bullet_item+',
       group: 'block',
     },
-    list_item: {
+    bullet_item: {
       content: 'paragraph block*',
     },
     code_block: {
