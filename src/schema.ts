@@ -25,7 +25,6 @@ export const schema = new Schema({
     title: {
       content: 'text*',
       marks: '',
-      defining: true,
     },
     paragraph: {
       content: 'inline*',
@@ -36,7 +35,6 @@ export const schema = new Schema({
       content: 'text*',
       marks: '',
       group: 'block',
-      defining: true,
     },
     blockquote: {
       content: 'block+',
@@ -49,7 +47,6 @@ export const schema = new Schema({
     todo_item: {
       attrs: { checked: { default: false } },
       content: 'paragraph block*',
-      defining: true,
     },
     ordered_list: {
       content: 'list_item+',
@@ -61,17 +58,12 @@ export const schema = new Schema({
     },
     list_item: {
       content: 'paragraph block*',
-      defining: true,
     },
     code_block: {
       attrs: { editorId: { default: null }, language: { default: null } },
       content: 'text*',
       marks: '',
       group: 'block',
-      code: true,
-      defining: true,
-      isolating: true,
-      atom: true,
     },
     image_block: {
       attrs: {
@@ -83,8 +75,6 @@ export const schema = new Schema({
       content: 'image_block_caption',
       marks: '',
       group: 'block',
-      draggable: true,
-      isolating: true,
     },
     image_block_caption: {
       content: 'text*',
@@ -102,8 +92,6 @@ export const schema = new Schema({
       content: 'video_block_caption',
       marks: '',
       group: 'block',
-      draggable: true,
-      isolating: true,
     },
     video_block_caption: {
       content: 'text*',
@@ -121,7 +109,6 @@ export const schema = new Schema({
   marks: {
     link: {
       attrs: { href: { default: '' } },
-      inclusive: false,
     },
     bold: {},
     italic: {},
