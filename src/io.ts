@@ -36,16 +36,10 @@ export interface IOEmitEvents {
     version: Version
     doc: DocJson
     ipfsGatewayUri: string
-    readable: boolean
     writable: boolean
   }) => void
   transaction: (e: { version: Version; steps: DocJson[]; clientIDs: ClientID[] }) => void
-  persistence: (e: {
-    version: Version
-    updatedAt: number
-    readable: boolean
-    writable: boolean
-  }) => void
+  persistence: (e: { version: Version; updatedAt: number; writable: boolean }) => void
 }
 
 export interface CreateFileSource {

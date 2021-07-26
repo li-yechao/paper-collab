@@ -148,7 +148,6 @@ export default class Client {
     }
 
     const {
-      readable,
       writable,
       instance: { doc, version },
       config: { ipfsGatewayUri },
@@ -158,7 +157,6 @@ export default class Client {
       version,
       doc: doc.toJSON(),
       ipfsGatewayUri,
-      readable,
       writable,
     })
     this.clientVersion = version
@@ -170,7 +168,6 @@ export default class Client {
     }
 
     const {
-      readable,
       writable,
       instance: {
         persistence: { version, updatedAt },
@@ -179,7 +176,6 @@ export default class Client {
     this.socket.emit('persistence', {
       version,
       updatedAt,
-      readable,
       writable,
     })
   }
