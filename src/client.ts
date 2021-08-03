@@ -94,7 +94,9 @@ export default class Client {
       return
     }
 
-    this.clientVersion = this.instance.addEvents(version, steps, this.id).version
+    this.instance.addEvents(version, steps, this.id).version
+
+    this.emitTransaction()
 
     const sockets: RemoteSocket<{ client: Client }>[] = await this.socket
       .in(this.instance.key)
