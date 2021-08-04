@@ -57,9 +57,7 @@ export default class Client {
     this.clientVersion = this.instance.version
 
     if (!this.readable) {
-      this.socket.emit('error', { message: 'Forbidden' })
-      this.socket.disconnect(true)
-      return
+      throw new Error('Forbidden')
     }
 
     this.socket
@@ -89,12 +87,19 @@ export default class Client {
 
   clientVersion: number
 
-  private onTransaction: IOListenEvents['transaction'] = async ({ version, steps }) => {
-    if (!this.checkWritable()) {
+  private onTransaction: IOListenEvents['transaction'] = async ({ version, steps }, cb) => {
+    if (!this.writable) {
+      cb({ message: 'Forbidden' })
       return
     }
 
-    this.instance.addEvents(version, steps, this.id).version
+    try {
+      const result = this.instance.addEvents(version, steps, this.id)
+      cb({ version: result.version })
+    } catch (error) {
+      cb({ message: error.message })
+      return
+    }
 
     this.emitTransaction()
 
@@ -107,45 +112,43 @@ export default class Client {
     }
   }
 
-  private onSave: IOListenEvents['save'] = async () => {
-    if (!this.checkWritable()) {
+  private onSave: IOListenEvents['save'] = async cb => {
+    if (!this.writable) {
+      cb({ message: 'Forbidden' })
       return
     }
-    await this.instance.save()
+    try {
+      await this.instance.save()
+      cb()
+    } catch (error) {
+      cb({ message: error.message })
+    }
   }
 
   private onCreateFile: IOListenEvents['createFile'] = async ({ source }, cb) => {
-    if (Array.isArray(source)) {
-      const hash: string[] = []
-      for await (const r of await IPFS.shared.addAll(source)) {
-        hash.push(r.cid.toString())
+    if (!this.writable) {
+      cb({ message: 'Forbidden' })
+      return
+    }
+
+    try {
+      if (Array.isArray(source)) {
+        const hash: string[] = []
+        for await (const r of await IPFS.shared.addAll(source)) {
+          hash.push(r.cid.toString())
+        }
+        cb({ hash })
+      } else {
+        const { cid } = await IPFS.shared.add(source)
+        cb({ hash: [cid.toString()] })
       }
-      cb({ hash })
-    } else {
-      const { cid } = await IPFS.shared.add(source)
-      cb({ hash: [cid.toString()] })
+    } catch (error) {
+      cb({ message: error.message })
     }
-  }
-
-  private checkWritable(): boolean {
-    if (this.writable) {
-      return true
-    }
-    this.socket.emit('error', { message: 'Forbidden' })
-    return false
-  }
-
-  private checkReadable(): boolean {
-    if (this.readable) {
-      return true
-    }
-    this.socket.emit('error', { message: 'Forbidden' })
-    this.socket.disconnect()
-    return false
   }
 
   emitPaper() {
-    if (!this.checkReadable()) {
+    if (!this.readable) {
       return
     }
 
@@ -165,7 +168,7 @@ export default class Client {
   }
 
   emitPersistence() {
-    if (!this.checkReadable()) {
+    if (!this.readable) {
       return
     }
 
@@ -183,7 +186,7 @@ export default class Client {
   }
 
   emitTransaction() {
-    if (!this.checkReadable()) {
+    if (!this.readable) {
       return
     }
 

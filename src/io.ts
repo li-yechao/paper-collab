@@ -20,12 +20,17 @@ export type Socket<T = {}> = Omit<_Socket<IOListenEvents, IOEmitEvents>, 'data'>
 
 export type RemoteSocket<T = {}> = Omit<_RemoteSocket<IOEmitEvents>, 'data'> & { data: T }
 
+export type Error = { message: string }
+
 export interface IOListenEvents {
-  transaction: (e: { version: Version; steps: DocJson[] }) => void
-  save: () => void
+  transaction: (
+    e: { version: Version; steps: DocJson[] },
+    cb: (e: Error | { version: Version }) => void
+  ) => void
+  save: (cb: (e?: Error) => void) => void
   createFile: (
     e: { source: CreateFileSource | CreateFileSource[] },
-    cb: (e: { hash: string[] }) => void
+    cb: (e: Error | { hash: string[] }) => void
   ) => void
 }
 
