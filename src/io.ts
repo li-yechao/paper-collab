@@ -25,12 +25,12 @@ export type Error = { message: string }
 export interface IOListenEvents {
   transaction: (
     e: { version: Version; steps: DocJson[] },
-    cb: (e: Error | { version: Version }) => void
+    cb?: (e: Error | { version: Version }) => void
   ) => void
-  save: (cb: (e?: Error) => void) => void
+  save: (cb?: (e?: Error) => void) => void
   createFile: (
     e: { source: CreateFileSource | CreateFileSource[] },
-    cb: (e: Error | { hash: string[] }) => void
+    cb?: (e: Error | { hash: string[] }) => void
   ) => void
 }
 

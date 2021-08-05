@@ -89,15 +89,15 @@ export default class Client {
 
   private onTransaction: IOListenEvents['transaction'] = async ({ version, steps }, cb) => {
     if (!this.writable) {
-      cb({ message: 'Forbidden' })
+      cb?.({ message: 'Forbidden' })
       return
     }
 
     try {
       const result = this.instance.addEvents(version, steps, this.id)
-      cb({ version: result.version })
+      cb?.({ version: result.version })
     } catch (error) {
-      cb({ message: error.message })
+      cb?.({ message: error.message })
       return
     }
 
@@ -114,20 +114,20 @@ export default class Client {
 
   private onSave: IOListenEvents['save'] = async cb => {
     if (!this.writable) {
-      cb({ message: 'Forbidden' })
+      cb?.({ message: 'Forbidden' })
       return
     }
     try {
       await this.instance.save()
-      cb()
+      cb?.()
     } catch (error) {
-      cb({ message: error.message })
+      cb?.({ message: error.message })
     }
   }
 
   private onCreateFile: IOListenEvents['createFile'] = async ({ source }, cb) => {
     if (!this.writable) {
-      cb({ message: 'Forbidden' })
+      cb?.({ message: 'Forbidden' })
       return
     }
 
@@ -137,13 +137,13 @@ export default class Client {
         for await (const r of await IPFS.shared.addAll(source)) {
           hash.push(r.cid.toString())
         }
-        cb({ hash })
+        cb?.({ hash })
       } else {
         const { cid } = await IPFS.shared.add(source)
-        cb({ hash: [cid.toString()] })
+        cb?.({ hash: [cid.toString()] })
       }
     } catch (error) {
-      cb({ message: error.message })
+      cb?.({ message: error.message })
     }
   }
 
