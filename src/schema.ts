@@ -108,6 +108,17 @@ export const schema = new Schema({
       content: 'text*',
       marks: '',
     },
+    math_inline: {
+      content: 'text*',
+      group: 'inline',
+      marks: '',
+      inline: true,
+    },
+    math_display: {
+      content: 'text*',
+      group: 'block',
+      marks: '',
+    },
   },
   marks: {
     link: {
