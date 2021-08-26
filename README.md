@@ -33,7 +33,7 @@ yarn serve \
 
 ## Online Demo
 
-<https://paper.yechao.h5plus.org/editor?paperId=60c9a03a00eaf09700b8500f&socketUri=https://paper.yechao.h5plus.org&accessToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2MjU4ODUxNTUsImV4cCI6MTY1NzQyMTE1NSwic3ViIjoiNjAxM2FmMjcwMGNiN2FhNzAwMjY4NzAwIiwicGFwZXJfaWQiOiI2MGM5YTAzYTAwZWFmMDk3MDBiODUwMGYifQ.CsXGYBxYxub8Lx8OtTH2FflMy1cnbPe2cibHjIzPwRs>
+<https://paper.yechao.xyz/editor?paperId=60c9a03a00eaf09700b8500f&socketUri=https://paper.yechao.xyz&accessToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2MjU4ODUxNTUsImV4cCI6MTY1NzQyMTE1NSwic3ViIjoiNjAxM2FmMjcwMGNiN2FhNzAwMjY4NzAwIiwicGFwZXJfaWQiOiI2MGM5YTAzYTAwZWFmMDk3MDBiODUwMGYifQ.CsXGYBxYxub8Lx8OtTH2FflMy1cnbPe2cibHjIzPwRs>
 
 ## License
 
